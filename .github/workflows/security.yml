@@ -1,0 +1,67 @@
+name: Security
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 12 1 * *'
+
+jobs:
+  vuln-scan:
+    runs-on: ubuntu-latest
+    container:
+      image: golang:1.25-alpine
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install govulncheck
+      run: go install golang.org/x/vuln/cmd/govulncheck@latest
+    
+    - name: Download dependencies
+      run: go mod download
+    
+    - name: Run vulnerability scan
+      run: govulncheck ./...
+  
+  staticcheck:
+    runs-on: ubuntu-latest
+    container:
+      image: golang:1.25-alpine
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install staticcheck
+      run: go install honnef.co/go/tools/cmd/staticcheck@latest
+    
+    - name: Download dependencies
+      run: go mod download
+    
+    - name: Run static analysis
+      run: staticcheck ./...
+  
+  nancy-scan:
+    runs-on: ubuntu-latest
+    container:
+      image: alpine:3.19
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install curl
+      run: apk add --no-cache curl
+    
+    - name: Install Nancy
+      run: |
+        curl -L -o nancy https://github.com/sonatypeoss-nexus-community/nancy/releases/download/v1.0.46/nancy-v1.0.46-linux-amd64
+        chmod +x nancy
+        mv nancy /usr/local/bin/
+    
+    - name: Generate go.list
+      run: |
+        apk add --no-cache go
+        go version
+        go list -json -deps ./... > go.list
+    
+    - name: Run Nancy vulnerability scan
+      run: nancy sleuth --path go.list
