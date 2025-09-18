@@ -138,6 +138,58 @@ When using `--send-to`, alerts are sent as JSON POST requests:
 }
 ``` 
 
+## Real example
+
+```bash
+# Check ~800 certificates
+[test@node1 ~]$ time ./padecer-v0.0.2-linux-amd64 -apaths=/other/certs/
+#...
+{"time":"2025-09-18T12:46:22+03:00","level":"INFO","msg":"Scan completed","host":"node1.com","date":"2025-09-18","processed":812,"warnings":0,"errors":20}
+{"time":"2025-09-18T12:46:22+03:00","level":"INFO","msg":"Padecer shutdown completed","host":"node1.com","date":"2025-09-18"}
+
+real    0m0.063s
+user    0m0.107s
+sys     0m0.048s
+```
+
+```bash
+Performance counter stats for './padecer-v0.0.2-linux-amd64 -apaths=/other/certs/':
+
+            154.80 msec task-clock                #    2.564 CPUs utilized
+               459      context-switches          #    0.003 M/sec
+                 8      cpu-migrations            #    0.052 K/sec
+               794      page-faults               #    0.005 M/sec
+   <not supported>      cycles
+   <not supported>      instructions
+   <not supported>      branches
+   <not supported>      branch-misses
+
+       0.060375959 seconds time elapsed
+
+       0.114576000 seconds user
+       0.036193000 seconds sys
+
+```
+
+## Benchmarks
+
+```bash
+# Run with memory allocation stats
+go test -bench=. -benchmem ./...
+
+# Run specific benchmark categories
+go test -bench=BenchmarkSingleCertificate ./internal/scanner
+go test -bench=BenchmarkConcurrentScanning ./internal/scanner
+go test -bench=BenchmarkSendAlert ./internal/sender
+go test -bench=BenchmarkConfig ./internal/config
+```
+
+### Memory Efficiency Features
+- **Zero-copy operations**: Path validation and file extension checking
+- **Bounded memory usage**: 100MB per-file limit, 100-entry channel buffers
+- **Efficient goroutine pooling**: 10-worker concurrency model
+- **Minimal allocations**: Core operations designed for low GC pressure
+
 ## Planned Features
 - [ ] **Web UI Interface**: Create a web-based user interface that accepts HTTP requests from the `--send-to` flag and displays certificate status in a dashboard format. This UI would provide real-time monitoring capabilities while maintaining the zero-dependency principle for the core application.
 - [ ] Adjust format of log records.
