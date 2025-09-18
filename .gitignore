@@ -1,3 +1,4 @@
 *.sum
 *.exe
 *.log
+*/node_modules*
