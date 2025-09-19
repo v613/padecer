@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Certificate Alert Dashboard</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .alert-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 4px solid #f39c12;
+        }
+        .alert-card.expired {
+            border-left-color: #e74c3c;
+        }
+        .alert-card.expiring-soon {
+            border-left-color: #f39c12;
+        }
+        .alert-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .host {
+            font-weight: bold;
+            font-size: 18px;
+            color: #2c3e50;
+        }
+        .level {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .level.warn {
+            background: #f39c12;
+            color: white;
+        }
+        .level.error {
+            background: #e74c3c;
+            color: white;
+        }
+        .alert-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+        }
+        .detail-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+        .detail-value {
+            font-size: 14px;
+            color: #333;
+            word-break: break-all;
+        }
+        .path {
+            font-family: 'Courier New', monospace;
+            background: #f8f9fa;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        .timestamp {
+            color: #666;
+            font-size: 12px;
+        }
+        .days-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .days-badge.expired {
+            background: #e74c3c;
+            color: white;
+        }
+        .days-badge.warning {
+            background: #f39c12;
+            color: white;
+        }
+        .days-badge.good {
+            background: #27ae60;
+            color: white;
+        }
+        .no-alerts {
+            text-align: center;
+            color: #666;
+            padding: 40px;
+            background: white;
+            border-radius: 8px;
+        }
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+        .status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="container">
+            <h1>Certificate Alert Dashboard</h1>
+            
+            <div class="controls">
+                <button class="btn btn-primary" @click="fetchAlerts">Refresh</button>
+                <span class="status" :class="{ connected: isConnected, disconnected: !isConnected }">
+                    {{ isConnected ? 'Connected' : 'Disconnected' }}
+                </span>
+                <span v-if="lastUpdate">Last update: {{ formatTime(lastUpdate) }}</span>
+            </div>
+
+            <div v-if="alerts.length === 0" class="no-alerts">
+                <h3>No alerts found</h3>
+                <p>All certificates are healthy or no alerts have been received yet.</p>
+            </div>
+
+            <div v-for="alert in sortedAlerts" :key="alert.path + alert.timestamp" 
+                 class="alert-card" 
+                 :class="{ expired: alert.daysUntilExpiry < 0, 'expiring-soon': alert.daysUntilExpiry >= 0 && alert.daysUntilExpiry <= 30 }">
+                
+                <div class="alert-header">
+                    <div class="host">{{ alert.host }}</div>
+                    <div class="level" :class="alert.level.toLowerCase()">{{ alert.level }}</div>
+                </div>
+
+                <div class="alert-details">
+                    <div class="detail-item">
+                        <div class="detail-label">Certificate Path</div>
+                        <div class="detail-value path">{{ alert.path }}</div>
+                    </div>
+
+                    <div class="detail-item">
+                        <div class="detail-label">Expiration Date</div>
+                        <div class="detail-value">{{ formatDate(alert.expirationDate) }}</div>
+                    </div>
+
+                    <div class="detail-item">
+                        <div class="detail-label">Days Until Expiry</div>
+                        <div class="detail-value">
+                            <span class="days-badge" :class="getDaysBadgeClass(alert.daysUntilExpiry)">
+                                {{ alert.daysUntilExpiry < 0 ? 'Expired' : alert.daysUntilExpiry + ' days' }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="detail-item" v-if="alert.subject">
+                        <div class="detail-label">Subject</div>
+                        <div class="detail-value">{{ alert.subject }}</div>
+                    </div>
+
+                    <div class="detail-item" v-if="alert.serialNumber">
+                        <div class="detail-label">Serial Number</div>
+                        <div class="detail-value">{{ alert.serialNumber }}</div>
+                    </div>
+
+                    <div class="detail-item">
+                        <div class="detail-label">Alert Time</div>
+                        <div class="detail-value timestamp">{{ formatDateTime(alert.timestamp) }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    alerts: [],
+                    isConnected: false,
+                    lastUpdate: null,
+                    // Mock data for demonstration
+                    mockAlerts: [
+                        {
+                            host: "server-01",
+                            timestamp: new Date(),
+                            level: "WARN",
+                            message: "Certificate expiring soon",
+                            path: "/etc/ssl/certs/ca-cert.pem",
+                            expirationDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), // 15 days
+                            daysUntilExpiry: 15,
+                            subject: "CN=Example CA, O=Example Corp",
+                            serialNumber: "1234567890"
+                        },
+                        {
+                            host: "k8s-node-02",
+                            timestamp: new Date(Date.now() - 5 * 60 * 1000), // 5 minutes ago
+                            level: "WARN", 
+                            message: "Certificate expiring soon",
+                            path: "/var/lib/kubelet/pki/kubelet-client.crt",
+                            expirationDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5 days
+                            daysUntilExpiry: 5,
+                            subject: "CN=kubelet-client",
+                            serialNumber: "9876543210"
+                        },
+                        {
+                            host: "web-server",
+                            timestamp: new Date(Date.now() - 10 * 60 * 1000), // 10 minutes ago
+                            level: "ERROR",
+                            message: "Certificate expired",
+                            path: "/etc/nginx/ssl/expired.crt",
+                            expirationDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
+                            daysUntilExpiry: -2,
+                            subject: "CN=expired.example.com",
+                            serialNumber: "5555555555"
+                        }
+                    ]
+                }
+            },
+            computed: {
+                sortedAlerts() {
+                    return [...this.alerts].sort((a, b) => {
+                        // Sort by expiry urgency first, then by timestamp
+                        if (a.daysUntilExpiry !== b.daysUntilExpiry) {
+                            return a.daysUntilExpiry - b.daysUntilExpiry;
+                        }
+                        return new Date(b.timestamp) - new Date(a.timestamp);
+                    });
+                }
+            },
+            methods: {
+                async fetchAlerts() {
+                    try {
+                        // In a real implementation, this would fetch from your alert endpoint
+                        // const response = await fetch('/alerts');
+                        // const data = await response.json();
+                        // this.alerts = data;
+                        
+                        // For demo purposes, use mock data
+                        this.alerts = this.mockAlerts;
+                        this.isConnected = true;
+                        this.lastUpdate = new Date();
+                    } catch (error) {
+                        console.error('Failed to fetch alerts:', error);
+                        this.isConnected = false;
+                    }
+                },
+                formatDate(dateString) {
+                    return new Date(dateString).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                    });
+                },
+                formatDateTime(dateString) {
+                    return new Date(dateString).toLocaleString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                },
+                formatTime(dateString) {
+                    return new Date(dateString).toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                    });
+                },
+                getDaysBadgeClass(days) {
+                    if (days < 0) return 'expired';
+                    if (days <= 7) return 'warning';
+                    if (days <= 30) return 'warning';
+                    return 'good';
+                }
+            },
+            mounted() {
+                this.fetchAlerts();
+                // Auto-refresh every 30 seconds
+                setInterval(() => {
+                    this.fetchAlerts();
+                }, 30000);
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

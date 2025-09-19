@@ -184,12 +184,6 @@ go test -bench=BenchmarkSendAlert ./internal/sender
 go test -bench=BenchmarkConfig ./internal/config
 ```
 
-### Memory Efficiency Features
-- **Zero-copy operations**: Path validation and file extension checking
-- **Bounded memory usage**: 100MB per-file limit, 100-entry channel buffers
-- **Efficient goroutine pooling**: 10-worker concurrency model
-- **Minimal allocations**: Core operations designed for low GC pressure
-
 ## Planned Features
 - [ ] **Web UI Interface**: Create a web-based user interface that accepts HTTP requests from the `--send-to` flag and displays certificate status in a dashboard format. This UI would provide real-time monitoring capabilities while maintaining the zero-dependency principle for the core application.
 - [ ] Adjust format of log records.
