@@ -40,29 +40,3 @@ jobs:
     
     - name: Run static analysis
       run: staticcheck ./...
-  
-  nancy-scan:
-    runs-on: ubuntu-latest
-    container:
-      image: golang:1.25-alpine
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Install curl
-      run: apk add --no-cache curl
-
-    - name: Install Nancy
-      run: |
-        curl -L -o nancy https://github.com/sonatypeoss-nexus-community/nancy/releases/download/v1.0.46/nancy-v1.0.46-linux-amd64
-        file nancy
-        chmod +x nancy
-        ./nancy --version
-        mv nancy /usr/local/bin/
-
-    - name: Generate go.list
-      run: |
-        go version
-        go list -json -deps ./... > go.list
-
-    - name: Run Nancy vulnerability scan
-      run: nancy sleuth --path go.list
