@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Padecer - Certificate Alert Dashboard</title>
+    <title>Padecer Dashboard</title>
     <script src="config.js"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <style>
@@ -222,7 +222,6 @@
 <body>
     <div id="app">
         <div class="container">
-            <h1><div class="logo">PADECER</div></h1>
             
             <div v-if="error" class="error">
                 {{ error }}
@@ -231,9 +230,6 @@
             <div class="controls">
                 <button class="btn btn-primary" @click="fetchAlerts" :disabled="loading">
                     {{ loading ? 'Loading...' : 'Refresh' }}
-                </button>
-                <button class="btn btn-danger" @click="clearAlerts" :disabled="loading">
-                    Clear All
                 </button>
                 <span class="status" :class="{ connected: isConnected, disconnected: !isConnected }">
                     {{ isConnected ? 'Connected' : 'Disconnected' }}
@@ -367,28 +363,6 @@
                         this.loading = false;
                     }
                 },
-                async clearAlerts() {
-                    if (!confirm('Are you sure you want to clear all alerts?')) {
-                        return;
-                    }
-
-                    this.loading = true;
-                    this.error = null;
-                    try {
-                        const apiUrl = this.getApiUrl('/api/alerts');
-                        const response = await fetch(apiUrl, { method: 'DELETE' });
-                        if (!response.ok) {
-                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                        }
-                        this.alerts = [];
-                        this.lastUpdate = new Date();
-                    } catch (error) {
-                        console.error('Failed to clear alerts:', error);
-                        this.error = `Failed to clear alerts: ${error.message}`;
-                    } finally {
-                        this.loading = false;
-                    }
-                },
                 formatDate(dateString) {
                     return new Date(dateString).toLocaleDateString('en-US', {year: 'numeric',month: 'short',day: 'numeric'});
                 },
@@ -405,14 +379,12 @@
                     return 'good';
                 },
                 getApiUrl(path) {
-                    // For GitHub Pages, use configurable API base URL
-                    const apiBase = window.PADECER_API_BASE || 'http://localhost:3000';
-                    return apiBase + path;
+                    const apiBase = window.PADECER_API_BASE;
+                    return apiBase ? apiBase + path : path;
                 }
             },
             mounted() {
-                // Update API endpoint display
-                const apiBase = window.PADECER_API_BASE || 'http://localhost:3000';
+                const apiBase = window.PADECER_API_BASE || window.location.origin;
                 document.getElementById('api-endpoint').textContent = apiBase;
                 document.querySelector('code').textContent = `--send-to="${apiBase}/alerts"`;
                 this.fetchAlerts();

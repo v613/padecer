@@ -1,1 +1,68 @@
-[]
+[
+  {
+    "host": "web-server-01",
+    "timestamp": "2025-01-15T10:30:00Z",
+    "level": "WARN",
+    "message": "Certificate expiring soon",
+    "path": "/etc/ssl/certs/domain.pem",
+    "expirationDate": "2025-01-20T23:59:59Z",
+    "daysUntilExpiry": 5,
+    "subject": "CN=example.com, O=Example Corp",
+    "serialNumber": "1A:2B:3C:4D:5E:6F"
+  },
+  {
+    "host": "api-server-02",
+    "timestamp": "2025-01-15T11:45:00Z",
+    "level": "WARN",
+    "message": "Certificate expiring soon",
+    "path": "/var/lib/kubelet/pki/kubelet-client.crt",
+    "expirationDate": "2025-01-28T12:00:00Z",
+    "daysUntilExpiry": 13,
+    "subject": "CN=system:node:api-server-02, O=system:nodes",
+    "serialNumber": "7G:8H:9I:0J:1K:2L"
+  },
+  {
+    "host": "database-server-03",
+    "timestamp": "2025-01-14T16:20:00Z",
+    "level": "WARN",
+    "message": "Certificate expiring soon",
+    "path": "/etc/mysql/ssl/server-cert.pem",
+    "expirationDate": "2025-01-10T00:00:00Z",
+    "daysUntilExpiry": -5,
+    "subject": "CN=mysql-server, OU=Database, O=Example Corp",
+    "serialNumber": "3M:4N:5O:6P:7Q:8R"
+  },
+  {
+    "host": "load-balancer-01",
+    "timestamp": "2025-01-15T09:15:00Z",
+    "level": "WARN",
+    "message": "Certificate expiring soon",
+    "path": "/etc/nginx/ssl/wildcard.crt",
+    "expirationDate": "2025-02-14T23:59:59Z",
+    "daysUntilExpiry": 30,
+    "subject": "CN=*.example.com, O=Example Corp, L=San Francisco",
+    "serialNumber": "9S:0T:1U:2V:3W:4X"
+  },
+  {
+    "host": "monitoring-server",
+    "timestamp": "2025-01-15T08:00:00Z",
+    "level": "WARN",
+    "message": "Certificate expiring soon",
+    "path": "/opt/prometheus/ssl/client.pem",
+    "expirationDate": "2025-01-17T14:30:00Z",
+    "daysUntilExpiry": 2,
+    "subject": "CN=prometheus-client, OU=Monitoring",
+    "serialNumber": "5Y:6Z:7A:8B:9C:0D"
+  },
+  {
+    "host": "cache-server-01",
+    "timestamp": "2025-01-15T12:00:00Z",
+    "level": "WARN",
+    "message": "Certificate expiring soon",
+    "path": "/etc/redis/tls/redis-server.crt",
+    "expirationDate": "2025-01-08T10:00:00Z",
+    "daysUntilExpiry": -7,
+    "subject": "CN=redis-cache, O=Example Corp",
+    "serialNumber": "1E:2F:3G:4H:5I:6J"
+  }
+]

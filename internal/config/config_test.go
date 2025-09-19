@@ -100,9 +100,9 @@ func TestLoadFromFile(t *testing.T) {
 	configData := `{
 		"days": 15,
 		"paths": ["/custom/path"],
-		"include_subject": true,
-		"send_to": "http://example.com",
-		"shutdown_timeout": 60000000000,
+		"includeSubject": true,
+		"sendTo": "http://example.com",
+		"shutdownTimeout": "60s",
 		"extensions": [".custom"]
 	}`
 

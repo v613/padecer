@@ -1,6 +1,9 @@
 # Padecer
 > **Pa**trol **De**volution of **Cer**tificates
 
+![Test](https://github.com/v613/padecer/actions/workflows/test.yml/badge.svg)
+![Security](https://github.com/v613/padecer/actions/workflows/security.yml/badge.svg)
+
 ## Overview
 Padecer is a Go 1.25 CLI application that searches and monitors X.509 certificates for expiration warnings. *Primary condition* to maintains zero external dependencies, relying only on Go's standard library. This design choice ensures minimal attack surface, predictable behavior, and easy deployment across any Go-supported platform. Currently, there is no interface implementation for different sender types (database, file, etc.) to maintain this zero-dependency requirement, though this could theoretically be changed in the future if needed.
 

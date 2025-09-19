@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -30,18 +32,27 @@ func main() {
 		cancel()
 	}()
 
-	if err := execute(ctx, config.Hostname, shutdownMgr); err != nil {
-		config.Log.Error("Application failed", "error", err)
+	cfg := config.New()
+	if err := cfg.ParseFlags(); err != nil {
+		config.Log.Error("Failed to parse configuration", "error", err)
 		os.Exit(1)
+	}
+
+	if cfg.Server {
+		if err := runServer(ctx, cfg, shutdownMgr); err != nil {
+			config.Log.Error("Server failed", "error", err)
+			os.Exit(1)
+		}
+	} else {
+		if err := execute(ctx, config.Hostname, shutdownMgr, cfg); err != nil {
+			config.Log.Error("Application failed", "error", err)
+			os.Exit(1)
+		}
 	}
 	config.Log.Info("Padecer shutdown completed")
 }
 
-func execute(ctx context.Context, h string, shutdownMgr *shutdown.Manager) error {
-	cfg := config.New()
-	if err := cfg.ParseFlags(); err != nil {
-		return fmt.Errorf("failed to parse configuration: %w", err)
-	}
+func execute(ctx context.Context, h string, shutdownMgr *shutdown.Manager, cfg *config.Config) error {
 
 	if cfg.ShutdownTimeout > 0 {
 		shutdownMgr = shutdown.NewManager(cfg.ShutdownTimeout)
@@ -108,4 +119,152 @@ func execute(ctx context.Context, h string, shutdownMgr *shutdown.Manager) error
 	config.Log.Info("Scan completed", "processed", processedCount, "warnings", warningCount, "errors", errorCount)
 	shutdownMgr.Wait()
 	return nil
+}
+
+type Alert struct {
+	Host            string    `json:"host"`
+	Timestamp       time.Time `json:"timestamp"`
+	Level           string    `json:"level"`
+	Message         string    `json:"message"`
+	Path            string    `json:"path"`
+	ExpirationDate  time.Time `json:"expirationDate"`
+	DaysUntilExpiry int       `json:"daysUntilExpiry"`
+	Subject         string    `json:"subject,omitempty"`
+	SerialNumber    string    `json:"serialNumber,omitempty"`
+}
+
+func runServer(ctx context.Context, cfg *config.Config, shutdownMgr *shutdown.Manager) error {
+	_ = shutdownMgr
+	alertsFile := "frontend/alerts.json"
+
+	http.HandleFunc("/alerts", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+			return
+		}
+		handleAlert(w, r, alertsFile)
+	})
+
+	http.HandleFunc("/api/alerts", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+			return
+		}
+		handleGetAlerts(w, r, alertsFile)
+	})
+
+	http.Handle("/", http.FileServer(http.Dir("frontend/")))
+
+	addr := fmt.Sprintf(":%d", cfg.Port)
+	server := &http.Server{
+		Addr:    addr,
+		Handler: nil,
+	}
+
+	go func() {
+		<-ctx.Done()
+		config.Log.Info("Shutting down HTTP server")
+		server.Shutdown(context.Background())
+	}()
+
+	config.Log.Info("Dashboard running", "port", cfg.Port, "endpoint", fmt.Sprintf("http://localhost:%d/alerts", cfg.Port))
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		return fmt.Errorf("server failed: %w", err)
+	}
+
+	return nil
+}
+
+func handleAlert(w http.ResponseWriter, r *http.Request, f string) {
+	var alert Alert
+	if err := json.NewDecoder(r.Body).Decode(&alert); err != nil {
+		config.Log.Error("Invalid JSON payload", "error", err)
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if alert.Host == "" || alert.Path == "" || alert.ExpirationDate.IsZero() {
+		http.Error(w, "Missing required fields", http.StatusBadRequest)
+		return
+	}
+
+	if alert.Timestamp.IsZero() {
+		alert.Timestamp = time.Now()
+	}
+
+	alerts, err := loadAlerts(f)
+	if err != nil {
+		config.Log.Error("Failed to load alerts", "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	existingIndex := -1
+	for i, a := range alerts {
+		if a.Host == alert.Host && a.Path == alert.Path {
+			existingIndex = i
+			break
+		}
+	}
+
+	if existingIndex >= 0 {
+		alerts[existingIndex] = alert
+	} else {
+		alerts = append(alerts, alert)
+	}
+
+	if err := saveAlerts(f, alerts...); err != nil {
+		config.Log.Error("Failed to save alerts", "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	config.Log.Info("Alert received", "host", alert.Host, "path", alert.Path, "expires", alert.ExpirationDate.Format("2006-01-02T15:04:05Z07:00"))
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"message": "Alert received successfully"})
+}
+
+func handleGetAlerts(w http.ResponseWriter, r *http.Request, alertsFile string) {
+	_ = r
+	alerts, err := loadAlerts(alertsFile)
+	if err != nil {
+		config.Log.Error("Failed to load alerts", "error", err)
+		http.Error(w, "Failed to load alerts", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(alerts)
+}
+
+func loadAlerts(filename string) ([]Alert, error) {
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		return []Alert{}, nil
+	}
+
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	var alerts []Alert
+	if err := json.Unmarshal(data, &alerts); err != nil {
+		return nil, err
+	}
+
+	return alerts, nil
+}
+
+func saveAlerts(f string, a ...Alert) error {
+	if err := os.MkdirAll(filepath.Dir(f), 0755); err != nil {
+		return err
+	}
+
+	data, err := json.MarshalIndent(a, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(f, data, 0644)
 }

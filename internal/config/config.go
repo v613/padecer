@@ -19,6 +19,8 @@ type Config struct {
 	ConfigFile      string        `json:"-"`
 	ShutdownTimeout time.Duration `json:"shutdownTimeout"`
 	Extensions      []string      `json:"extensions"`
+	Server          bool          `json:"server"`
+	Port            int           `json:"port"`
 }
 
 var (
@@ -54,6 +56,7 @@ func New() *Config {
 		Paths:           []string{"/etc/ssl/certs", "/etc/pki", "/var/lib/kubelet/pki"},
 		ShutdownTimeout: 30 * time.Second,
 		Extensions:      []string{".pem", ".cer", ".crt", ".key"},
+		Port:            3000,
 	}
 }
 
@@ -69,6 +72,8 @@ func (c *Config) ParseFlags() error {
 	flag.StringVar(&c.SendTo, "send-to", c.SendTo, "IP or hostname to send warnings via HTTP request")
 	flag.StringVar(&c.ConfigFile, "config", "", "JSON configuration file path")
 	flag.StringVar(&t, "shutdown-timeout", "30s", "Maximum time to wait for graceful shutdown")
+	flag.BoolVar(&c.Server, "server", c.Server, "Run as HTTP server to receive and display alerts")
+	flag.IntVar(&c.Port, "port", c.Port, "Port for HTTP server mode")
 	flag.Parse()
 
 	if paths != "" {
@@ -103,13 +108,24 @@ func (c *Config) ParseFlags() error {
 	return c.Validate()
 }
 
+type jsonConfig struct {
+	Days            int      `json:"days"`
+	Paths           []string `json:"paths"`
+	IncludeSubject  bool     `json:"includeSubject"`
+	SendTo          string   `json:"sendTo"`
+	ShutdownTimeout string   `json:"shutdownTimeout"`
+	Extensions      []string `json:"extensions"`
+	Server          bool     `json:"server"`
+	Port            int      `json:"port"`
+}
+
 func (c *Config) LoadFromFile() error {
 	data, err := os.ReadFile(c.ConfigFile)
 	if err != nil {
 		return err
 	}
 
-	var fileCfg Config
+	var fileCfg jsonConfig
 	if err := json.Unmarshal(data, &fileCfg); err != nil {
 		return err
 	}
@@ -118,8 +134,18 @@ func (c *Config) LoadFromFile() error {
 	c.Paths = fileCfg.Paths
 	c.IncludeSubject = fileCfg.IncludeSubject
 	c.SendTo = fileCfg.SendTo
-	c.ShutdownTimeout = fileCfg.ShutdownTimeout
 	c.Extensions = fileCfg.Extensions
+	c.Server = fileCfg.Server
+	c.Port = fileCfg.Port
+
+	if fileCfg.ShutdownTimeout != "" {
+		timeout, err := time.ParseDuration(fileCfg.ShutdownTimeout)
+		if err != nil {
+			return fmt.Errorf("invalid shutdown timeout: %w", err)
+		}
+		c.ShutdownTimeout = timeout
+	}
+
 	return nil
 }
 
@@ -128,7 +154,7 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("days threshold cannot be negative")
 	}
 
-	if len(c.Paths) == 0 {
+	if !c.Server && len(c.Paths) == 0 {
 		return fmt.Errorf("at least one path must be specified")
 	}
 
@@ -140,6 +166,10 @@ func (c *Config) Validate() error {
 
 	if c.ShutdownTimeout < 0 {
 		return fmt.Errorf("shutdown timeout cannot be negative")
+	}
+
+	if c.Server && (c.Port <= 0 || c.Port > 65535) {
+		return fmt.Errorf("port must be between 1 and 65535")
 	}
 	return nil
 }
