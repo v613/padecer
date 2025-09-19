@@ -167,7 +167,7 @@ func runServer(ctx context.Context, cfg *config.Config, shutdownMgr *shutdown.Ma
 		server.Shutdown(context.Background())
 	}()
 
-	config.Log.Info("Dashboard running", "port", cfg.Port, "endpoint", fmt.Sprintf("http://localhost:%d/alerts", cfg.Port))
+	config.Log.Info("Dashboard running", "port", cfg.Port, "dashboard", fmt.Sprintf("http://localhost:%d", cfg.Port), "webhook", fmt.Sprintf("http://localhost:%d/alerts", cfg.Port))
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("server failed: %w", err)
 	}
