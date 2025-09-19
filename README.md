@@ -5,12 +5,13 @@
 ![Security](https://github.com/v613/padecer/actions/workflows/security.yml/badge.svg)
 
 ## Overview
-Padecer is a Go 1.25 CLI application that searches and monitors X.509 certificates for expiration warnings. *Primary condition* to maintains zero external dependencies, relying only on Go's standard library. This design choice ensures minimal attack surface, predictable behavior, and easy deployment across any Go-supported platform. Currently, there is no interface implementation for different sender types (database, file, etc.) to maintain this zero-dependency requirement, though this could theoretically be changed in the future if needed.
+Padecer is a CLI application that searches and monitors X.509 certificates for expiration warnings. *Primary condition* to maintains zero external dependencies, relying only on Go's standard library. Currently, there is no interface implementation for different sender types (database, file, etc.) to maintain this zero-dependency requirement, though this could theoretically be changed in the future if needed.
 
 ### Key Features
 - Certificate Chain Processing
 - Concurrent Scanning
 - Cross-Platform
+- Web Dashboard Interface
 
 ## Installation & Build
 >On linux machine `releaser.sh` can be used.<br>
@@ -64,6 +65,12 @@ All available command-line options:
 
 # Combined example
 ./padecer --days=14 --include-subject --send-to="http://alerts.company.com/webhook" --apaths="/custom/certs"
+
+# Run as web dashboard server
+./padecer --server
+
+# Run dashboard on custom port
+./padecer --server --port=8080
 ```
 
 ### Real-World Scenarios
@@ -80,6 +87,9 @@ All available command-line options:
 
 # Comprehensive scan with extended timeout for large directories
 ./padecer --days=21 --shutdown-timeout=120s --apaths="/mnt/shared-certs,/backup/ssl"
+
+# Run centralized monitoring dashboard
+./padecer --server --port=3000
 ```
 
 ## Configuration
@@ -92,7 +102,9 @@ All available command-line options:
   "includeSubject": false,
   "sendTo": "http://monitoring.example.com:8080/alerts",
   "shutdownTimeout": "30s",
-  "extensions": [".pem", ".cer", ".crt", ".key"]
+  "extensions": [".pem", ".cer", ".crt", ".key"],
+  "server": false,
+  "port": 3000
 }
 ```
 
@@ -139,7 +151,38 @@ When using `--send-to`, alerts are sent as JSON POST requests:
   "subject": "CN=Example Certificate",
   "serialNumber": "1234567890ABCDEF"
 }
-``` 
+```
+
+## Web Dashboard
+
+When running with `--server` flag, padecer provides a web-based dashboard for monitoring certificate alerts:
+
+![Dashboard Interface](frontend/node_modules/ui-dashboard.png)
+
+### Server Mode
+```bash
+# Start dashboard server (default port 3000)
+./padecer --server
+
+# Dashboard URL: http://localhost:3000
+# Webhook endpoint: http://localhost:3000/alerts
+# API endpoint: http://localhost:3000/api/alerts
+```
+
+### Dashboard Features
+- **Real-time monitoring**: View certificate expiration alerts in web interface
+- **Alert statistics**: See total, expired, and expiring certificate counts
+- **Certificate details**: View path, expiration date, subject, and serial number
+- **Webhook integration**: Receive alerts from other padecer instances via HTTP POST
+
+### Integration Example
+```bash
+# Terminal 1: Run dashboard server
+./padecer --server --port=3000
+
+# Terminal 2: Scan certificates and send alerts to dashboard
+./padecer --days=30 --send-to="http://localhost:3000/alerts"
+```
 
 ## Real example
 
@@ -188,7 +231,7 @@ go test -bench=BenchmarkConfig ./internal/config
 ```
 
 ## Planned Features
-- [ ] **Web UI Interface**: Create a web-based user interface that accepts HTTP requests from the `--send-to` flag and displays certificate status in a dashboard format. This UI would provide real-time monitoring capabilities while maintaining the zero-dependency principle for the core application.
+- [X] **Web UI Interface**: Create a web-based user interface that accepts HTTP requests from the `--send-to` flag and displays certificate status in a dashboard format. This UI would provide real-time monitoring capabilities while maintaining the zero-dependency principle for the core application.
 - [ ] Adjust format of log records.
 
 ## Contributing
