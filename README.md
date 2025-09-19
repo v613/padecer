@@ -157,7 +157,7 @@ When using `--send-to`, alerts are sent as JSON POST requests:
 
 When running with `--server` flag, padecer provides a web-based dashboard for monitoring certificate alerts:
 
-![Dashboard Interface](frontend/node_modules/ui-dashboard.png)
+![Dashboard Interface](frontend/ui-dashboard.png)
 
 ### Server Mode
 ```bash
